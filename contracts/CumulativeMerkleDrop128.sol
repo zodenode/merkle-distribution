@@ -8,23 +8,38 @@ import "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 import "./interfaces/ICumulativeMerkleDrop128.sol";
 
+/// @title CumulativeMerkleDrop128
+/// @dev This contract allows for claims of tokens based on a merkle tree.
 contract CumulativeMerkleDrop128 is Ownable, ICumulativeMerkleDrop128 {
     using SafeERC20 for IERC20;
 
+    /// @notice The token to be claimed.
     address public immutable override token;
 
+    /// @notice The current merkle root for the claims tree.
     bytes16 public override merkleRoot;
+    /// @notice Tracks the cumulative amount claimed for each address.
     mapping(address => uint256) public cumulativeClaimed;
 
+    /// @param token_ The token to be claimed.
     constructor(address token_) {
         token = token_;
     }
 
+    /// @notice Sets a new merkle root for the claims tree.
+    /// @dev Only callable by the owner.
+    /// @param merkleRoot_ The new merkle root.
     function setMerkleRoot(bytes16 merkleRoot_) external override onlyOwner {
         emit MerkelRootUpdated(merkleRoot, merkleRoot_);
         merkleRoot = merkleRoot_;
     }
 
+    /// @notice Allows an account to claim an amount of the token.
+    /// @param salt Random data to ensure uniqueness of the merkle leaf.
+    /// @param account The address of the account making the claim.
+    /// @param cumulativeAmount The cumulative amount the account is claiming.
+    /// @param expectedMerkleRoot The expected current merkle root.
+    /// @param merkleProof The merkle proof needed to claim the tokens.
     function claim(
         bytes16 salt,
         address account,
@@ -51,29 +66,10 @@ contract CumulativeMerkleDrop128 is Ownable, ICumulativeMerkleDrop128 {
         }
     }
 
-    // function verify(bytes calldata proof, bytes16 root, bytes16 leaf) public pure returns (bool) {
-    //     for (uint256 i = 0; i < proof.length / 16; i++) {
-    //         bytes16 node = _getBytes16(proof[i*16:(i+1)*16]);
-    //         if (leaf < node) {
-    //             leaf = _keccak128(abi.encodePacked(leaf, node));
-    //         } else {
-    //             leaf = _keccak128(abi.encodePacked(node, leaf));
-    //         }
-    //     }
-    //     return leaf == root;
-    // }
-    //
-    // function _keccak128(bytes memory input) internal pure returns(bytes16) {
-    //     return bytes16(keccak256(input));
-    // }
-    //
-    // function _getBytes16(bytes calldata input) internal pure returns(bytes16 res) {
-    //     // solhint-disable-next-line no-inline-assembly
-    //     assembly {
-    //         res := calldataload(input.offset)
-    //     }
-    // }
-
+    /// @dev Verifies a merkle proof in assembly.
+    /// @param proof The merkle proof.
+    /// @param root The root of the merkle tree.
+    /// @param leaf The leaf being proven.
     function _verifyAsm(bytes calldata proof, bytes16 root, bytes16 leaf) private pure returns (bool valid) {
         /// @solidity memory-safe-assembly
         assembly {  // solhint-disable-line no-inline-assembly
